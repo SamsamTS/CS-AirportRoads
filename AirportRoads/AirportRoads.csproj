@@ -48,6 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AirportRoads.cs" />
+    <Compile Include="DebugUtils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -79,6 +80,10 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Icons\taxiway_selected.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\runway_tooltip.png" />
+    <EmbeddedResource Include="Icons\taxiway_tooltip.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

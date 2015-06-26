@@ -27,21 +27,52 @@ namespace AirportRoads
         }
         #endregion
 
-        public static readonly string version = "1.1";
+        public const string version = "1.2";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
             base.OnLevelLoaded(mode);
             if (mode == LoadMode.LoadGame || mode == LoadMode.NewGame)
             {
-                LoadResources();
-                InitMod();
+                try
+                {
+                    LoadResources();
+                    InitMod();
+                }
+                catch(Exception e)
+                {
+                    DebugUtils.Warning("Failed to load.");
+                    Debug.LogException(e);
+                }
             }
         }
 
-        private void ShowNetwork(String name, String desc, GeneratedScrollPanel panel, string prefixIcon)
+        private UITextureAtlas m_atlas;
+
+        private void InitMod()
         {
+            PublicTransportPanel panel = GameObject.Find("PublicTransportPlanePanel").GetComponent<PublicTransportPanel>();
+            ShowNetwork("Airplane Runway", "Runway", panel, "runway_", 7000, 600);
+            ShowNetwork("Airplane Taxiway", "Taxiway", panel, "taxiway_", 4000, 200);
+        }
+
+        private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, string prefixIcon, int constructionCost, int maintenanceCost)
+        {
+            if (panel.Find<UIButton>(name) != null) return;
+
             var netInfo = PrefabCollection<NetInfo>.FindLoaded(name);
+
+            if (netInfo == null)
+            {
+                DebugUtils.Warning("Couldn't find NetInfo named '" + name + "'");
+                return;
+            }
+
+            DebugUtils.Log("NetInfo named '" + name + "' found.");
+
+            PlayerNetAI netAI = netInfo.m_netAI as PlayerNetAI;
+            netAI.m_constructionCost = constructionCost;
+            netAI.m_maintenanceCost = maintenanceCost;
 
             Locale locale = (Locale)typeof(LocaleManager).GetField("m_Locale", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonLite<LocaleManager>.instance);
             Locale.Key key = new Locale.Key() { m_Identifier = "NET_TITLE", m_Key = name };
@@ -59,75 +90,135 @@ namespace AirportRoads
             button.hoveredBgSprite = prefixIcon + "hover";
             button.pressedBgSprite = prefixIcon + "pressed";
             button.focusedBgSprite = prefixIcon + "selected";
-
         }
 
-        private void InitMod()
+        private void LoadResources()
         {
-            PublicTransportPanel ptp = GameObject.Find("PublicTransportPlanePanel").GetComponent<PublicTransportPanel>();
-            ShowNetwork("Airplane Runway", "Runway", ptp, "runway_");
-            ShowNetwork("Airplane Taxiway", "Taxiway", ptp, "taxiway_");
-        }
-
-        public UITextureAtlas m_atlas;
-
-        public void LoadResources()
-        {
-            string[] spriteNames = new string[]
-			{
-				"runway_default",
-				"runway_disabled",
-				"runway_hover",
-				"runway_pressed",
-				"runway_selected",
-				"taxiway_default",
-				"taxiway_disabled",
-				"taxiway_hover",
-				"taxiway_pressed",
-				"taxiway_selected"
-			};
-            this.m_atlas = this.CreateTextureAtlas("AirportRoads", UIView.GetAView().defaultAtlas.material, spriteNames, "AirportRoads.Icons.");
-        }
-
-        private UITextureAtlas CreateTextureAtlas(string atlasName, Material baseMaterial, string[] spriteNames, string assemblyPath)
-        {
-            int num = 1024;
-            Texture2D texture2D = new Texture2D(num, num, TextureFormat.ARGB32, false);
-            Texture2D[] array = new Texture2D[spriteNames.Length];
-            Rect[] array2 = new Rect[spriteNames.Length];
-            for (int i = 0; i < spriteNames.Length; i++)
+            // Add tooltip images into the atlas
+            UITextureAtlas atlas = GeneratedPanel.roadTooltipBox.Find<UISprite>("Sprite").atlas;
+            if (atlas["Airplane Runway"] == null)
             {
-                array[i] = this.loadTextureFromAssembly(assemblyPath + spriteNames[i] + ".png", false);
+                Texture2D[] textures = new Texture2D[]
+                {
+                    loadTextureFromAssembly("AirportRoads.Icons.runway_tooltip.png"),
+                    loadTextureFromAssembly("AirportRoads.Icons.taxiway_tooltip.png")
+                };
+                textures[0].name = "Airplane Runway";
+                textures[1].name = "Airplane Taxiway";
+
+                AddTexturesInAtlas(atlas, textures);
             }
-            array2 = texture2D.PackTextures(array, 2, num);
-            UITextureAtlas uITextureAtlas = ScriptableObject.CreateInstance<UITextureAtlas>();
-            Material material = UnityEngine.Object.Instantiate<Material>(baseMaterial);
+
+            // Create icon atlas
+            if (m_atlas == null)
+            {
+                string[] spriteNames = new string[]
+			    {
+				    "runway_default",
+				    "runway_disabled",
+				    "runway_hover",
+				    "runway_pressed",
+				    "runway_selected",
+				    "taxiway_default",
+				    "taxiway_disabled",
+				    "taxiway_hover",
+				    "taxiway_pressed",
+				    "taxiway_selected"
+			    };
+                this.m_atlas = this.CreateTextureAtlas("AirportRoads", spriteNames, "AirportRoads.Icons.");
+            }
+        }
+
+        private UITextureAtlas CreateTextureAtlas(string atlasName, string[] spriteNames, string assemblyPath)
+        {
+            int maxSize = 1024;
+            Texture2D texture2D = new Texture2D(maxSize, maxSize, TextureFormat.ARGB32, false);
+            Texture2D[] textures = new Texture2D[spriteNames.Length];
+            Rect[] regions = new Rect[spriteNames.Length];
+
+            for (int i = 0; i < spriteNames.Length; i++)
+                textures[i] = this.loadTextureFromAssembly(assemblyPath + spriteNames[i] + ".png");
+
+            regions = texture2D.PackTextures(textures, 2, maxSize);
+
+            UITextureAtlas textureAtlas = ScriptableObject.CreateInstance<UITextureAtlas>();
+            Material material = UnityEngine.Object.Instantiate<Material>(UIView.GetAView().defaultAtlas.material);
             material.mainTexture = texture2D;
-            uITextureAtlas.material = material;
-            uITextureAtlas.name = atlasName;
+            textureAtlas.material = material;
+            textureAtlas.name = atlasName;
+
             for (int i = 0; i < spriteNames.Length; i++)
             {
                 UITextureAtlas.SpriteInfo item = new UITextureAtlas.SpriteInfo
                 {
                     name = spriteNames[i],
                     texture = texture2D,
-                    region = array2[i]
+                    region = regions[i]
                 };
-                uITextureAtlas.AddSprite(item);
+                textureAtlas.AddSprite(item);
             }
-            return uITextureAtlas;
+
+            return textureAtlas;
         }
 
-        private Texture2D loadTextureFromAssembly(string path, bool readOnly = true)
+        private Texture2D loadTextureFromAssembly(string path)
         {
-            Assembly executingAssembly = Assembly.GetExecutingAssembly();
-            Stream manifestResourceStream = executingAssembly.GetManifestResourceStream(path);
+            Stream manifestResourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path);
+
             byte[] array = new byte[manifestResourceStream.Length];
             manifestResourceStream.Read(array, 0, array.Length);
+
             Texture2D texture2D = new Texture2D(2, 2, TextureFormat.ARGB32, false);
             texture2D.LoadImage(array);
-            texture2D.Apply(false, readOnly);
+
             return texture2D;
+        }
+
+        private void AddTexturesInAtlas(UITextureAtlas atlas, Texture2D[] newTextures)
+        {
+            Texture2D[] textures = new Texture2D[atlas.count + newTextures.Length];
+
+            for (int i = 0; i < atlas.count; i++)
+            {
+                // Locked textures workaround
+                Texture2D texture2D = atlas.sprites[i].texture;
+
+                RenderTexture renderTexture = RenderTexture.GetTemporary(texture2D.width, texture2D.height, 0);
+                Graphics.Blit(texture2D, renderTexture);
+
+                RenderTexture active = RenderTexture.active;
+                texture2D = new Texture2D(renderTexture.width, renderTexture.height);
+                RenderTexture.active = renderTexture;
+                texture2D.ReadPixels(new Rect(0f, 0f, (float)renderTexture.width, (float)renderTexture.height), 0, 0);
+                texture2D.Apply();
+                RenderTexture.active = active;
+
+                RenderTexture.ReleaseTemporary(renderTexture);
+
+                textures[i] = texture2D;
+                textures[i].name = atlas.sprites[i].name;
+            }
+
+            for (int i = 0; i < newTextures.Length; i++)
+                textures[atlas.count + i] = newTextures[i];
+
+            Rect[] regions = atlas.texture.PackTextures(textures, atlas.padding, 4096, false);
+
+            atlas.sprites.Clear();
+
+            for (int i = 0; i < textures.Length; i++)
+            {
+                UITextureAtlas.SpriteInfo spriteInfo = atlas[textures[i].name];
+                atlas.sprites.Add(new UITextureAtlas.SpriteInfo
+                {
+                    texture = textures[i],
+                    name = textures[i].name,
+                    border = (spriteInfo != null) ? spriteInfo.border : new RectOffset(),
+                    region = regions[i]
+                });
+            }
+
+            atlas.RebuildIndexes();
         }
     }
 }
