@@ -9,6 +9,9 @@ using UnityEngine;
 using System;
 using System.IO;
 using System.Reflection;
+using System.Collections.Generic;
+
+using Detour;
 
 
 namespace AirportRoads
@@ -27,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2";
+        public const string version = "1.2.1";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -51,7 +54,11 @@ namespace AirportRoads
 
         private void InitMod()
         {
+            // StreetDirectionViewer support
+            InitSDV();
+
             PublicTransportPanel panel = GameObject.Find("PublicTransportPlanePanel").GetComponent<PublicTransportPanel>();
+
             ShowNetwork("Airplane Runway", "Runway", panel, "runway_", 7000, 600);
             ShowNetwork("Airplane Taxiway", "Taxiway", panel, "taxiway_", 4000, 200);
         }
@@ -90,6 +97,10 @@ namespace AirportRoads
             button.hoveredBgSprite = prefixIcon + "hover";
             button.pressedBgSprite = prefixIcon + "pressed";
             button.focusedBgSprite = prefixIcon + "selected";
+            button.isVisible = true;
+            button.enabled = true;
+
+            DebugUtils.Log(name + " button added to " + panel.name + ". Position: " + button.relativePosition.x + ", " + button.relativePosition.y);
         }
 
         private void LoadResources()
@@ -220,5 +231,92 @@ namespace AirportRoads
 
             atlas.RebuildIndexes();
         }
+
+        #region StreetDirectionViewer support
+        private static void InitSDV()
+        {
+            Type ArrowManager = Type.GetType("StreetDirectionViewer.ArrowManager");
+            // SDV installed ?
+            if (ArrowManager == null) return;
+
+            // Getting StreetDirectionViewerUI instance
+            object instance = null;
+            FieldInfo field = typeof(ThreadingWrapper).GetField("m_ThreadingExtensions", BindingFlags.NonPublic | BindingFlags.Instance);
+            List<IThreadingExtension> threadingExtensions = field.GetValue(Singleton<SimulationManager>.instance.m_ThreadingWrapper) as List<IThreadingExtension>;
+            Type type = Type.GetType("StreetDirectionViewer.ThreadingExtension");
+
+            for (int i = 0; i < threadingExtensions.Count; i++)
+            {
+                if (threadingExtensions[i].GetType() == type)
+                {
+                    field = type.GetField("streetDirectionViewerUI", BindingFlags.NonPublic | BindingFlags.Instance);
+                    instance = field.GetValue(threadingExtensions[i]);
+                    DebugUtils.Log("StreetDirectionViewerUI instance found");
+                    break;
+                }
+            }
+
+            // SDV enabled ?
+            if (instance == null) return;
+            DebugUtils.Log("StreetDirectionViewer mod detected. Adding support.");
+
+            // Getting arrowManager
+            type = Type.GetType("StreetDirectionViewer.StreetDirectionViewerUI");
+            field = type.GetField("arrowManager", BindingFlags.NonPublic | BindingFlags.Instance);
+            object arrowManager = field.GetValue(instance);
+
+            // Getting Update
+            type = Type.GetType("StreetDirectionViewer.ArrowManager");
+            MethodInfo update = type.GetMethod("Update", BindingFlags.Public | BindingFlags.Instance);
+
+            // Getting CreateButton
+            type = Type.GetType("StreetDirectionViewer.StreetDirectionViewerUI");
+            MethodInfo createButton = type.GetMethod("CreateButton", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            // IsAirstripOrHarbor redirect
+            MethodInfo from = ArrowManager.GetMethod("IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo to = typeof(AirportRoads).GetMethod("IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
+            Detour.RedirectCallsState state = null;
+            bool buttonAdded = false;
+
+            UIPanel planePanel = GameObject.Find("PublicTransportPlanePanel").GetComponent<UIPanel>();
+            planePanel.eventVisibilityChanged += (c, visible) =>
+            {
+                if (visible)
+                {
+                    if (!buttonAdded)
+                    {
+                        DebugUtils.Message("Calling CreateButton");
+                        UIComponent component = GameObject.Find("RoadsOptionPanel(PublicTransportPanel)").GetComponent<UIComponent>();
+                        buttonAdded = (bool)createButton.Invoke(instance, new object[] { component });
+                    }
+
+                    state = RedirectionHelper.RedirectCalls(from, to);
+                    update.Invoke(arrowManager, null);
+                }
+                else if (state != null)
+                {
+                    RedirectionHelper.RevertRedirect(from, state);
+                    state = null;
+                }
+            };
+        }
+
+        private static bool IsAirstripOrHarbor(NetSegment segment)
+        {
+            NetInfo.Lane[] lanes = segment.Info.m_lanes;
+            
+            for (int i = 0; i < lanes.Length; i++)
+            {
+                NetInfo.Lane lane = lanes[i];
+                if (lane.m_vehicleType.IsFlagSet(VehicleInfo.VehicleType.Plane))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        #endregion
     }
 }
