@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2.1";
+        public const string version = "1.2.2";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -55,7 +55,14 @@ namespace AirportRoads
         private void InitMod()
         {
             // StreetDirectionViewer support
-            InitSDV();
+            try
+            {
+                InitSDV();
+            }
+            catch (Exception e)
+            {
+                DebugUtils.Log(e.Message);
+            }
 
             PublicTransportPanel panel = GameObject.Find("PublicTransportPlanePanel").GetComponent<PublicTransportPanel>();
 
@@ -243,13 +250,13 @@ namespace AirportRoads
             object instance = null;
             FieldInfo field = typeof(ThreadingWrapper).GetField("m_ThreadingExtensions", BindingFlags.NonPublic | BindingFlags.Instance);
             List<IThreadingExtension> threadingExtensions = field.GetValue(Singleton<SimulationManager>.instance.m_ThreadingWrapper) as List<IThreadingExtension>;
-            Type type = Type.GetType("StreetDirectionViewer.ThreadingExtension");
+            Type ThreadingExtension = Type.GetType("StreetDirectionViewer.ThreadingExtension");
 
             for (int i = 0; i < threadingExtensions.Count; i++)
             {
-                if (threadingExtensions[i].GetType() == type)
+                if (threadingExtensions[i].GetType() == ThreadingExtension)
                 {
-                    field = type.GetField("streetDirectionViewerUI", BindingFlags.NonPublic | BindingFlags.Instance);
+                    field = TryGetField(ThreadingExtension, "streetDirectionViewerUI", BindingFlags.NonPublic | BindingFlags.Instance);
                     instance = field.GetValue(threadingExtensions[i]);
                     DebugUtils.Log("StreetDirectionViewerUI instance found");
                     break;
@@ -261,25 +268,24 @@ namespace AirportRoads
             DebugUtils.Log("StreetDirectionViewer mod detected. Adding support.");
 
             // Getting arrowManager
-            type = Type.GetType("StreetDirectionViewer.StreetDirectionViewerUI");
-            field = type.GetField("arrowManager", BindingFlags.NonPublic | BindingFlags.Instance);
+            Type StreetDirectionViewerUI = TryGetType("StreetDirectionViewer.StreetDirectionViewerUI");
+            field = TryGetField(StreetDirectionViewerUI, "arrowManager", BindingFlags.NonPublic | BindingFlags.Instance);
             object arrowManager = field.GetValue(instance);
 
             // Getting Update
-            type = Type.GetType("StreetDirectionViewer.ArrowManager");
-            MethodInfo update = type.GetMethod("Update", BindingFlags.Public | BindingFlags.Instance);
+            MethodInfo Update = TryGetMethod(ArrowManager, "Update", BindingFlags.Public | BindingFlags.Instance);
 
             // Getting CreateButton
-            type = Type.GetType("StreetDirectionViewer.StreetDirectionViewerUI");
-            MethodInfo createButton = type.GetMethod("CreateButton", BindingFlags.NonPublic | BindingFlags.Instance);
+            MethodInfo CreateButton = TryGetMethod(StreetDirectionViewerUI, "CreateButton", BindingFlags.NonPublic | BindingFlags.Instance);
 
             // IsAirstripOrHarbor redirect
-            MethodInfo from = ArrowManager.GetMethod("IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
+            MethodInfo from = TryGetMethod(ArrowManager, "IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo to = typeof(AirportRoads).GetMethod("IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
             Detour.RedirectCallsState state = null;
             bool buttonAdded = false;
 
             UIPanel planePanel = GameObject.Find("PublicTransportPlanePanel").GetComponent<UIPanel>();
+            if (planePanel == null) throw new Exception("Couldn't find PublicTransportPlanePanel");
             planePanel.eventVisibilityChanged += (c, visible) =>
             {
                 if (visible)
@@ -288,11 +294,11 @@ namespace AirportRoads
                     {
                         DebugUtils.Message("Calling CreateButton");
                         UIComponent component = GameObject.Find("RoadsOptionPanel(PublicTransportPanel)").GetComponent<UIComponent>();
-                        buttonAdded = (bool)createButton.Invoke(instance, new object[] { component });
+                        buttonAdded = (bool)CreateButton.Invoke(instance, new object[] { component });
                     }
 
                     state = RedirectionHelper.RedirectCalls(from, to);
-                    update.Invoke(arrowManager, null);
+                    Update.Invoke(arrowManager, null);
                 }
                 else if (state != null)
                 {
@@ -300,6 +306,30 @@ namespace AirportRoads
                     state = null;
                 }
             };
+        }
+
+        private static Type TryGetType(string typeName)
+        {
+            Type type = Type.GetType(typeName);
+            if (type == null) throw new Exception ("Couldn't find the type "+typeName);
+
+            return type;
+        }
+
+        private static MethodInfo TryGetMethod(Type type, string name, BindingFlags flags)
+        {
+            MethodInfo method = type.GetMethod(name, flags);
+            if (method == null) throw new Exception("Couldn't find the method " + name);
+
+            return method;
+        }
+
+        private static FieldInfo TryGetField(Type type, string name, BindingFlags flags)
+        {
+            FieldInfo field = type.GetField(name, flags);
+            if (field == null) throw new Exception("Couldn't find the field " + name);
+
+            return field;
         }
 
         private static bool IsAirstripOrHarbor(NetSegment segment)
