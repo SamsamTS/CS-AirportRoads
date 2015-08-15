@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2.2";
+        public const string version = "1.2.5";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -44,7 +44,7 @@ namespace AirportRoads
                 }
                 catch(Exception e)
                 {
-                    DebugUtils.Warning("Failed to load.");
+                    DebugUtils.Log("Failed to load.");
                     Debug.LogException(e);
                 }
             }
@@ -54,9 +54,9 @@ namespace AirportRoads
 
         private void InitMod()
         {
-            // StreetDirectionViewer support
             try
             {
+                // StreetDirectionViewer support
                 InitSDV();
             }
             catch (Exception e)
@@ -66,15 +66,26 @@ namespace AirportRoads
 
             PublicTransportPanel panel = GameObject.Find("PublicTransportPlanePanel").GetComponent<PublicTransportPanel>();
 
-            ShowNetwork("Airplane Runway", "Runway", panel, "runway_", 7000, 600);
-            ShowNetwork("Airplane Taxiway", "Taxiway", panel, "taxiway_", 4000, 200);
+            if (panel == null)
+            {
+                DebugUtils.Log("Couldn't find PublicTransportPlanePanel.");
+                return;
+            }
+
+            ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600);
+            ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200);
+
+            panel.RefreshPanel();
+
+            SetIcon("Airplane Runway", panel, "runway_");
+            SetIcon("Airplane Taxiway", panel, "taxiway_");
         }
 
-        private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, string prefixIcon, int constructionCost, int maintenanceCost)
+        private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost)
         {
             if (panel.Find<UIButton>(name) != null) return;
 
-            var netInfo = PrefabCollection<NetInfo>.FindLoaded(name);
+            NetInfo netInfo = PrefabCollection<NetInfo>.FindLoaded(name);
 
             if (netInfo == null)
             {
@@ -85,18 +96,36 @@ namespace AirportRoads
             DebugUtils.Log("NetInfo named '" + name + "' found.");
 
             PlayerNetAI netAI = netInfo.m_netAI as PlayerNetAI;
+
+            // Adding cost
             netAI.m_constructionCost = constructionCost;
             netAI.m_maintenanceCost = maintenanceCost;
 
+            // Making the prefab valid
+            netInfo.m_availableIn = ItemClass.Availability.All;
+            netInfo.m_placementStyle = ItemClass.Placement.Manual;
+            typeof(NetInfo).GetField("m_UICategory", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(netInfo, "PublicTransportPlane");
+
+            // Changing the item class
+            ItemClass itemClass = netInfo.m_class;
+            netInfo.m_class = ScriptableObject.CreateInstance<ItemClass>();
+            netInfo.m_class.m_layer = itemClass.m_layer;
+            netInfo.m_class.m_level = itemClass.m_level;
+            netInfo.m_class.m_service = ItemClass.Service.PublicTransport;
+            netInfo.m_class.m_subService = ItemClass.SubService.PublicTransportPlane;
+
+            // Adding missing locale
             Locale locale = (Locale)typeof(LocaleManager).GetField("m_Locale", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonLite<LocaleManager>.instance);
             Locale.Key key = new Locale.Key() { m_Identifier = "NET_TITLE", m_Key = name };
             if(!locale.Exists(key)) locale.AddLocalizedString(key, name);
             key = new Locale.Key() { m_Identifier = "NET_DESC", m_Key = name };
             if(!locale.Exists(key)) locale.AddLocalizedString(key, desc);
+        }
 
-            typeof(GeneratedScrollPanel).GetMethod("CreateAssetItem", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(panel, new object[] { netInfo });
-            
+        private void SetIcon(string name, GeneratedScrollPanel panel, string prefixIcon)
+        {
             UIButton button = panel.Find<UIButton>(name);
+
             button.atlas = m_atlas;
             button.size = new Vector2(109, 75);
             button.normalBgSprite = prefixIcon + "default";
@@ -242,7 +271,7 @@ namespace AirportRoads
         #region StreetDirectionViewer support
         private static void InitSDV()
         {
-            Type ArrowManager = Type.GetType("StreetDirectionViewer.ArrowManager");
+            Type ArrowManager = Type.GetType("StreetDirectionViewer.ArrowManager, StreetDirectionViewer");
             // SDV installed ?
             if (ArrowManager == null) return;
 
@@ -250,7 +279,7 @@ namespace AirportRoads
             object instance = null;
             FieldInfo field = typeof(ThreadingWrapper).GetField("m_ThreadingExtensions", BindingFlags.NonPublic | BindingFlags.Instance);
             List<IThreadingExtension> threadingExtensions = field.GetValue(Singleton<SimulationManager>.instance.m_ThreadingWrapper) as List<IThreadingExtension>;
-            Type ThreadingExtension = Type.GetType("StreetDirectionViewer.ThreadingExtension");
+            Type ThreadingExtension = TryGetType("StreetDirectionViewer.ThreadingExtension, StreetDirectionViewer");
 
             for (int i = 0; i < threadingExtensions.Count; i++)
             {
@@ -268,7 +297,7 @@ namespace AirportRoads
             DebugUtils.Log("StreetDirectionViewer mod detected. Adding support.");
 
             // Getting arrowManager
-            Type StreetDirectionViewerUI = TryGetType("StreetDirectionViewer.StreetDirectionViewerUI");
+            Type StreetDirectionViewerUI = TryGetType("StreetDirectionViewer.StreetDirectionViewerUI, StreetDirectionViewer");
             field = TryGetField(StreetDirectionViewerUI, "arrowManager", BindingFlags.NonPublic | BindingFlags.Instance);
             object arrowManager = field.GetValue(instance);
 
