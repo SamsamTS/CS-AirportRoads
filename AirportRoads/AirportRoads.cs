@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2.5";
+        public const string version = "1.2.7";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -41,6 +41,7 @@ namespace AirportRoads
                 {
                     LoadResources();
                     InitMod();
+                    UIScrollbarFix.Init();
                 }
                 catch(Exception e)
                 {
@@ -72,16 +73,13 @@ namespace AirportRoads
                 return;
             }
 
-            ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600);
-            ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200);
+            ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600, "Runway");
+            ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200, "Taxiway");
 
             panel.RefreshPanel();
-
-            SetIcon("Airplane Runway", panel, "runway_");
-            SetIcon("Airplane Taxiway", panel, "taxiway_");
         }
 
-        private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost)
+        private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost, string prefixIcon)
         {
             if (panel.Find<UIButton>(name) != null) return;
 
@@ -114,29 +112,16 @@ namespace AirportRoads
             netInfo.m_class.m_service = ItemClass.Service.PublicTransport;
             netInfo.m_class.m_subService = ItemClass.SubService.PublicTransportPlane;
 
+            // Adding icons
+            netInfo.m_Atlas = m_atlas;
+            netInfo.m_Thumbnail = prefixIcon;
+
             // Adding missing locale
             Locale locale = (Locale)typeof(LocaleManager).GetField("m_Locale", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonLite<LocaleManager>.instance);
             Locale.Key key = new Locale.Key() { m_Identifier = "NET_TITLE", m_Key = name };
             if(!locale.Exists(key)) locale.AddLocalizedString(key, name);
             key = new Locale.Key() { m_Identifier = "NET_DESC", m_Key = name };
             if(!locale.Exists(key)) locale.AddLocalizedString(key, desc);
-        }
-
-        private void SetIcon(string name, GeneratedScrollPanel panel, string prefixIcon)
-        {
-            UIButton button = panel.Find<UIButton>(name);
-
-            button.atlas = m_atlas;
-            button.size = new Vector2(109, 75);
-            button.normalBgSprite = prefixIcon + "default";
-            button.disabledBgSprite = prefixIcon + "disabled";
-            button.hoveredBgSprite = prefixIcon + "hover";
-            button.pressedBgSprite = prefixIcon + "pressed";
-            button.focusedBgSprite = prefixIcon + "selected";
-            button.isVisible = true;
-            button.enabled = true;
-
-            DebugUtils.Log(name + " button added to " + panel.name + ". Position: " + button.relativePosition.x + ", " + button.relativePosition.y);
         }
 
         private void LoadResources()
@@ -147,8 +132,8 @@ namespace AirportRoads
             {
                 Texture2D[] textures = new Texture2D[]
                 {
-                    loadTextureFromAssembly("AirportRoads.Icons.runway_tooltip.png"),
-                    loadTextureFromAssembly("AirportRoads.Icons.taxiway_tooltip.png")
+                    loadTextureFromAssembly("AirportRoads.Icons.RunwayTooltip.png"),
+                    loadTextureFromAssembly("AirportRoads.Icons.TaxiwayTooltip.png")
                 };
                 textures[0].name = "Airplane Runway";
                 textures[1].name = "Airplane Taxiway";
@@ -161,16 +146,16 @@ namespace AirportRoads
             {
                 string[] spriteNames = new string[]
 			    {
-				    "runway_default",
-				    "runway_disabled",
-				    "runway_hover",
-				    "runway_pressed",
-				    "runway_selected",
-				    "taxiway_default",
-				    "taxiway_disabled",
-				    "taxiway_hover",
-				    "taxiway_pressed",
-				    "taxiway_selected"
+				    "Runway",
+				    "RunwayDisabled",
+				    "RunwayFocused",
+				    "RunwayHovered",
+				    "RunwayPressed",
+				    "Taxiway",
+				    "TaxiwayDisabled",
+				    "TaxiwayFocused",
+				    "TaxiwayHovered",
+				    "TaxiwayPressed"
 			    };
                 this.m_atlas = this.CreateTextureAtlas("AirportRoads", spriteNames, "AirportRoads.Icons.");
             }
@@ -199,9 +184,10 @@ namespace AirportRoads
                 UITextureAtlas.SpriteInfo item = new UITextureAtlas.SpriteInfo
                 {
                     name = spriteNames[i],
-                    texture = texture2D,
-                    region = regions[i]
+                    texture = textures[i],
+                    region = regions[i],
                 };
+
                 textureAtlas.AddSprite(item);
             }
 

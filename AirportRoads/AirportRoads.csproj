@@ -53,40 +53,41 @@
     <Compile Include="DebugUtils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RedirectionHelper.cs" />
+    <Compile Include="UIScrollbarFix.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\runway_default.png" />
+    <EmbeddedResource Include="Icons\Runway.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\runway_disabled.png" />
+    <EmbeddedResource Include="Icons\RunwayDisabled.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\runway_hover.png" />
+    <EmbeddedResource Include="Icons\RunwayHovered.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\runway_pressed.png" />
+    <EmbeddedResource Include="Icons\RunwayPressed.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\runway_selected.png" />
+    <EmbeddedResource Include="Icons\RunwayFocused.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\taxiway_default.png" />
+    <EmbeddedResource Include="Icons\Taxiway.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\taxiway_disabled.png" />
+    <EmbeddedResource Include="Icons\TaxiwayDisabled.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\taxiway_hover.png" />
+    <EmbeddedResource Include="Icons\TaxiwayHovered.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\taxiway_pressed.png" />
+    <EmbeddedResource Include="Icons\TaxiwayPressed.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\taxiway_selected.png" />
+    <EmbeddedResource Include="Icons\TaxiwayFocused.png" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Icons\runway_tooltip.png" />
-    <EmbeddedResource Include="Icons\taxiway_tooltip.png" />
+    <EmbeddedResource Include="Icons\RunwayTooltip.png" />
+    <EmbeddedResource Include="Icons\TaxiwayTooltip.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
