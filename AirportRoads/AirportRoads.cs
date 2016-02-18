@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2.7";
+        public const string version = "1.2.8";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -73,10 +73,11 @@ namespace AirportRoads
                 return;
             }
 
+            panel.RefreshPanel();
+
             ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600, "Runway");
             ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200, "Taxiway");
 
-            panel.RefreshPanel();
         }
 
         private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost, string prefixIcon)
@@ -122,6 +123,8 @@ namespace AirportRoads
             if(!locale.Exists(key)) locale.AddLocalizedString(key, name);
             key = new Locale.Key() { m_Identifier = "NET_DESC", m_Key = name };
             if(!locale.Exists(key)) locale.AddLocalizedString(key, desc);
+
+            typeof(GeneratedScrollPanel).GetMethod("CreateAssetItem", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(panel, new object[] { netInfo });
         }
 
         private void LoadResources()
