@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2.8";
+        public const string version = "1.2.9";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
@@ -41,7 +41,6 @@ namespace AirportRoads
                 {
                     LoadResources();
                     InitMod();
-                    UIScrollbarFix.Init();
                 }
                 catch(Exception e)
                 {
