@@ -16,7 +16,7 @@ using Detour;
 
 namespace AirportRoads
 {
-    public class AirportRoads : LoadingExtensionBase, IUserMod
+    public class AirportRoads : ThreadingExtensionBase, IUserMod
     {
         #region IUserMod implementation
         public string Name
@@ -30,25 +30,37 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.2.9";
+        public const string version = "1.3.0";
 
-        public override void OnLevelLoaded(LoadMode mode)
+        public override void OnUpdate(float realTimeDelta, float simulationTimeDelta)
         {
-            base.OnLevelLoaded(mode);
-            if (mode == LoadMode.LoadGame || mode == LoadMode.NewGame)
+            if (m_panelGameObject == null)
             {
+                m_panelGameObject = GameObject.Find("PublicTransportPlanePanel");
+
+                if (m_panelGameObject == null)
+                {
+                    m_panelGameObject = GameObject.Find("LandscapingPathsPanel");
+
+                    if (m_panelGameObject == null) return;
+                }
+
+                DebugUtils.Log(m_panelGameObject.name + " found.");
+
                 try
                 {
                     LoadResources();
                     InitMod();
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     DebugUtils.Log("Failed to load.");
                     Debug.LogException(e);
                 }
             }
         }
+
+        private GameObject m_panelGameObject;
 
         private UITextureAtlas m_atlas;
 
@@ -64,14 +76,7 @@ namespace AirportRoads
                 DebugUtils.Log(e.Message);
             }
 
-            PublicTransportPanel panel = GameObject.Find("PublicTransportPlanePanel").GetComponent<PublicTransportPanel>();
-
-            if (panel == null)
-            {
-                DebugUtils.Log("Couldn't find PublicTransportPlanePanel.");
-                return;
-            }
-
+            GeneratedScrollPanel panel = m_panelGameObject.GetComponent<GeneratedScrollPanel>();
             panel.RefreshPanel();
 
             ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600, "Runway");
@@ -129,8 +134,8 @@ namespace AirportRoads
         private void LoadResources()
         {
             // Add tooltip images into the atlas
-            UITextureAtlas atlas = GeneratedPanel.roadTooltipBox.Find<UISprite>("Sprite").atlas;
-            if (atlas["Airplane Runway"] == null)
+            UITextureAtlas atlas = GetAtlas("TooltipSprites");
+            if (atlas != null && atlas["Airplane Runway"] == null)
             {
                 Texture2D[] textures = new Texture2D[]
                 {
@@ -256,8 +261,20 @@ namespace AirportRoads
             atlas.RebuildIndexes();
         }
 
+        public static UITextureAtlas GetAtlas(string name)
+        {
+            UITextureAtlas[] atlases = Resources.FindObjectsOfTypeAll(typeof(UITextureAtlas)) as UITextureAtlas[];
+            for (int i = 0; i < atlases.Length; i++)
+            {
+                if (atlases[i].name == name)
+                    return atlases[i];
+            }
+
+            return UIView.GetAView().defaultAtlas;
+        }
+
         #region StreetDirectionViewer support
-        private static void InitSDV()
+        private void InitSDV()
         {
             Type ArrowManager = Type.GetType("StreetDirectionViewer.ArrowManager, StreetDirectionViewer");
             // SDV installed ?
@@ -295,32 +312,53 @@ namespace AirportRoads
             // Getting CreateButton
             MethodInfo CreateButton = TryGetMethod(StreetDirectionViewerUI, "CreateButton", BindingFlags.NonPublic | BindingFlags.Instance);
 
+            // Getting setShowStreetDirectionButtonState
+            MethodInfo ShowStreetDirection = TryGetMethod(StreetDirectionViewerUI, "setShowStreetDirectionButtonState", BindingFlags.Public | BindingFlags.Instance);
+
+
             // IsAirstripOrHarbor redirect
             MethodInfo from = TryGetMethod(ArrowManager, "IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo to = typeof(AirportRoads).GetMethod("IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
             Detour.RedirectCallsState state = null;
-            bool buttonAdded = false;
 
-            UIPanel planePanel = GameObject.Find("PublicTransportPlanePanel").GetComponent<UIPanel>();
-            if (planePanel == null) throw new Exception("Couldn't find PublicTransportPlanePanel");
-            planePanel.eventVisibilityChanged += (c, visible) =>
+
+            UIPanel optionsBar = GameObject.Find("OptionsBar").GetComponent<UIPanel>();
+
+            if (optionsBar == null) return;
+
+            optionsBar.eventComponentAdded += (c, component) =>
             {
-                if (visible)
+                try
                 {
-                    if (!buttonAdded)
+                    if (m_panelGameObject.GetComponent<UIPanel>().isVisible && component.name.StartsWith("RoadsOptionPanel"))
                     {
-                        DebugUtils.Message("Calling CreateButton");
-                        UIComponent component = GameObject.Find("RoadsOptionPanel(PublicTransportPanel)").GetComponent<UIComponent>();
-                        buttonAdded = (bool)CreateButton.Invoke(instance, new object[] { component });
-                    }
+                        DebugUtils.Log("RoadsOptionPanel added. Calling SDV CreateButton");
 
-                    state = RedirectionHelper.RedirectCalls(from, to);
-                    Update.Invoke(arrowManager, null);
+                        if ((bool)CreateButton.Invoke(instance, new object[] { component }))
+                        {
+                            DebugUtils.Log("SDV button created");
+
+                            ShowStreetDirection.Invoke(instance, new object[] { true });
+
+                            component.eventVisibilityChanged += (d, visible) =>
+                            {
+                                if (visible)
+                                {
+                                    state = RedirectionHelper.RedirectCalls(from, to);
+                                    Update.Invoke(arrowManager, null);
+                                }
+                                else if (state != null)
+                                {
+                                    RedirectionHelper.RevertRedirect(from, state);
+                                    state = null;
+                                }
+                            };
+                        }
+                    }
                 }
-                else if (state != null)
+                catch(Exception e)
                 {
-                    RedirectionHelper.RevertRedirect(from, state);
-                    state = null;
+                    DebugUtils.Log(e.Message);
                 }
             };
         }
