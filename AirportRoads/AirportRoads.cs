@@ -16,7 +16,7 @@ using Detour;
 
 namespace AirportRoads
 {
-    public class AirportRoads : ThreadingExtensionBase, IUserMod
+    public class AirportRoads : LoadingExtensionBase, IUserMod
     {
         #region IUserMod implementation
         public string Name
@@ -30,41 +30,46 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.0";
+        public const string version = "1.3.1";
 
-        public override void OnUpdate(float realTimeDelta, float simulationTimeDelta)
+        public static AirportRoads instance;
+        private GameObject m_gameObject;
+
+        public override void OnLevelLoaded(LoadMode mode)
         {
-            if (m_panelGameObject == null)
+            instance = this;
+            if (mode == LoadMode.LoadAsset || mode == LoadMode.NewAsset)
             {
-                m_panelGameObject = GameObject.Find("PublicTransportPlanePanel");
-
-                if (m_panelGameObject == null)
+                if (m_gameObject == null || m_gameObject.name != "AirportRoads")
                 {
-                    m_panelGameObject = GameObject.Find("LandscapingPathsPanel");
-
-                    if (m_panelGameObject == null) return;
+                    m_gameObject = new GameObject("AirportRoads");
+                    m_gameObject.AddComponent<AirportRoadsRoutine>();
                 }
+            }
+            else if (mode == LoadMode.LoadGame || mode == LoadMode.NewGame)
+            {
+                panelGameObject = GameObject.Find("PublicTransportPlanePanel");
+                DebugUtils.Log(panelGameObject.name + " found.");
 
-                DebugUtils.Log(m_panelGameObject.name + " found.");
-
-                try
-                {
-                    LoadResources();
-                    InitMod();
-                }
-                catch (Exception e)
-                {
-                    DebugUtils.Log("Failed to load.");
-                    Debug.LogException(e);
-                }
+                LoadResources();
+                InitMod();
             }
         }
 
-        private GameObject m_panelGameObject;
+        public override void OnLevelUnloading()
+        {
+            if (m_gameObject != null)
+            {
+                GameObject.Destroy(m_gameObject);
+                m_gameObject = null;
+            }
+        }
+
+        public static GameObject panelGameObject;
 
         private UITextureAtlas m_atlas;
 
-        private void InitMod()
+        public void InitMod()
         {
             try
             {
@@ -76,17 +81,16 @@ namespace AirportRoads
                 DebugUtils.Log(e.Message);
             }
 
-            GeneratedScrollPanel panel = m_panelGameObject.GetComponent<GeneratedScrollPanel>();
-            panel.RefreshPanel();
+            GeneratedScrollPanel panel = panelGameObject.GetComponent<GeneratedScrollPanel>();
 
             ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600, "Runway");
             ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200, "Taxiway");
-
         }
 
         private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost, string prefixIcon)
         {
-            if (panel.Find<UIButton>(name) != null) return;
+            UIButton button = panel.Find<UIButton>(name);
+            if (button != null && button.name == name) GameObject.DestroyImmediate(button);
 
             NetInfo netInfo = PrefabCollection<NetInfo>.FindLoaded(name);
 
@@ -124,14 +128,14 @@ namespace AirportRoads
             // Adding missing locale
             Locale locale = (Locale)typeof(LocaleManager).GetField("m_Locale", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(SingletonLite<LocaleManager>.instance);
             Locale.Key key = new Locale.Key() { m_Identifier = "NET_TITLE", m_Key = name };
-            if(!locale.Exists(key)) locale.AddLocalizedString(key, name);
+            if (!locale.Exists(key)) locale.AddLocalizedString(key, name);
             key = new Locale.Key() { m_Identifier = "NET_DESC", m_Key = name };
-            if(!locale.Exists(key)) locale.AddLocalizedString(key, desc);
+            if (!locale.Exists(key)) locale.AddLocalizedString(key, desc);
 
             typeof(GeneratedScrollPanel).GetMethod("CreateAssetItem", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(panel, new object[] { netInfo });
         }
 
-        private void LoadResources()
+        public void LoadResources()
         {
             // Add tooltip images into the atlas
             UITextureAtlas atlas = GetAtlas("TooltipSprites");
@@ -164,7 +168,7 @@ namespace AirportRoads
 				    "TaxiwayHovered",
 				    "TaxiwayPressed"
 			    };
-                this.m_atlas = this.CreateTextureAtlas("AirportRoads", spriteNames, "AirportRoads.Icons.");
+                m_atlas = CreateTextureAtlas("AirportRoads", spriteNames, "AirportRoads.Icons.");
             }
         }
 
@@ -176,7 +180,7 @@ namespace AirportRoads
             Rect[] regions = new Rect[spriteNames.Length];
 
             for (int i = 0; i < spriteNames.Length; i++)
-                textures[i] = this.loadTextureFromAssembly(assemblyPath + spriteNames[i] + ".png");
+                textures[i] = loadTextureFromAssembly(assemblyPath + spriteNames[i] + ".png");
 
             regions = texture2D.PackTextures(textures, 2, maxSize);
 
@@ -330,7 +334,7 @@ namespace AirportRoads
             {
                 try
                 {
-                    if (m_panelGameObject.GetComponent<UIPanel>().isVisible && component.name.StartsWith("RoadsOptionPanel"))
+                    if (panelGameObject.GetComponent<UIPanel>().isVisible && component.name.StartsWith("RoadsOptionPanel"))
                     {
                         DebugUtils.Log("RoadsOptionPanel added. Calling SDV CreateButton");
 
@@ -356,7 +360,7 @@ namespace AirportRoads
                         }
                     }
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     DebugUtils.Log(e.Message);
                 }
@@ -366,7 +370,7 @@ namespace AirportRoads
         private static Type TryGetType(string typeName)
         {
             Type type = Type.GetType(typeName);
-            if (type == null) throw new Exception ("Couldn't find the type "+typeName);
+            if (type == null) throw new Exception("Couldn't find the type " + typeName);
 
             return type;
         }
@@ -390,7 +394,7 @@ namespace AirportRoads
         private static bool IsAirstripOrHarbor(NetSegment segment)
         {
             NetInfo.Lane[] lanes = segment.Info.m_lanes;
-            
+
             for (int i = 0; i < lanes.Length; i++)
             {
                 NetInfo.Lane lane = lanes[i];
@@ -403,5 +407,30 @@ namespace AirportRoads
             return true;
         }
         #endregion
+    }
+
+    public class AirportRoadsRoutine : MonoBehaviour
+    {
+        public void Update()
+        {
+            if (AirportRoads.panelGameObject != null) return;
+
+            try
+            {
+                AirportRoads.panelGameObject = GameObject.Find("LandscapingPathsPanel");
+
+                if (AirportRoads.panelGameObject == null) return;
+
+                DebugUtils.Log(AirportRoads.panelGameObject.name + " found.");
+
+                AirportRoads.instance.LoadResources();
+                AirportRoads.instance.InitMod();
+            }
+            catch (Exception e)
+            {
+                DebugUtils.Log("Failed to load.");
+                Debug.LogException(e);
+            }
+        }
     }
 }
