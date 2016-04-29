@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.1";
+        public const string version = "1.3.2";
 
         public static AirportRoads instance;
         private GameObject m_gameObject;
@@ -48,11 +48,26 @@ namespace AirportRoads
             }
             else if (mode == LoadMode.LoadGame || mode == LoadMode.NewGame)
             {
-                panelGameObject = GameObject.Find("PublicTransportPlanePanel");
-                DebugUtils.Log(panelGameObject.name + " found.");
+                try
+                {
+                    panelGameObject = GameObject.Find("PublicTransportPlanePanel");
 
-                LoadResources();
-                InitMod();
+                    if (panelGameObject == null)
+                    {
+                        DebugUtils.Log("PublicTransportPlanePanel not found.");
+                        return;
+                    }
+
+                    DebugUtils.Log(panelGameObject.name + " found.");
+
+                    LoadResources();
+                    InitMod();
+                }
+                catch (Exception e)
+                {
+                    DebugUtils.Log("Failed to load.");
+                    Debug.LogException(e);
+                }
             }
         }
 
