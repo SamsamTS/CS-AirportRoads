@@ -30,7 +30,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.2";
+        public const string version = "1.3.3";
 
         public static AirportRoads instance;
         private GameObject m_gameObject;
@@ -325,30 +325,21 @@ namespace AirportRoads
             field = TryGetField(StreetDirectionViewerUI, "arrowManager", BindingFlags.NonPublic | BindingFlags.Instance);
             object arrowManager = field.GetValue(instance);
 
-            // Getting Update
-            MethodInfo Update = TryGetMethod(ArrowManager, "Update", BindingFlags.Public | BindingFlags.Instance);
-
             // Getting CreateButton
             MethodInfo CreateButton = TryGetMethod(StreetDirectionViewerUI, "CreateButton", BindingFlags.NonPublic | BindingFlags.Instance);
 
             // Getting setShowStreetDirectionButtonState
             MethodInfo ShowStreetDirection = TryGetMethod(StreetDirectionViewerUI, "setShowStreetDirectionButtonState", BindingFlags.Public | BindingFlags.Instance);
 
-
-            // IsAirstripOrHarbor redirect
-            MethodInfo from = TryGetMethod(ArrowManager, "IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
-            MethodInfo to = typeof(AirportRoads).GetMethod("IsAirstripOrHarbor", BindingFlags.NonPublic | BindingFlags.Static);
-            Detour.RedirectCallsState state = null;
-
-
             UIPanel optionsBar = GameObject.Find("OptionsBar").GetComponent<UIPanel>();
-
             if (optionsBar == null) return;
 
             optionsBar.eventComponentAdded += (c, component) =>
             {
                 try
                 {
+                    GameObject gameObject = GameObject.Find("StreetDirectionViewerButton");
+
                     if (panelGameObject.GetComponent<UIPanel>().isVisible && component.name.StartsWith("RoadsOptionPanel"))
                     {
                         DebugUtils.Log("RoadsOptionPanel added. Calling SDV CreateButton");
@@ -358,20 +349,6 @@ namespace AirportRoads
                             DebugUtils.Log("SDV button created");
 
                             ShowStreetDirection.Invoke(instance, new object[] { true });
-
-                            component.eventVisibilityChanged += (d, visible) =>
-                            {
-                                if (visible)
-                                {
-                                    state = RedirectionHelper.RedirectCalls(from, to);
-                                    Update.Invoke(arrowManager, null);
-                                }
-                                else if (state != null)
-                                {
-                                    RedirectionHelper.RevertRedirect(from, state);
-                                    state = null;
-                                }
-                            };
                         }
                     }
                 }
@@ -404,22 +381,6 @@ namespace AirportRoads
             if (field == null) throw new Exception("Couldn't find the field " + name);
 
             return field;
-        }
-
-        private static bool IsAirstripOrHarbor(NetSegment segment)
-        {
-            NetInfo.Lane[] lanes = segment.Info.m_lanes;
-
-            for (int i = 0; i < lanes.Length; i++)
-            {
-                NetInfo.Lane lane = lanes[i];
-                if (lane.m_vehicleType.IsFlagSet(VehicleInfo.VehicleType.Plane))
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
         #endregion
     }
