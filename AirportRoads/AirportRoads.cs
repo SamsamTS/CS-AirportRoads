@@ -11,9 +11,6 @@ using System.IO;
 using System.Reflection;
 using System.Collections.Generic;
 
-using Detour;
-
-
 namespace AirportRoads
 {
     public class AirportRoads : LoadingExtensionBase, IUserMod
