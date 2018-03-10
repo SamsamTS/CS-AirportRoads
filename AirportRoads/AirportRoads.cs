@@ -27,7 +27,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.3";
+        public const string version = "1.3.4";
 
         public static AirportRoads instance;
         private GameObject m_gameObject;
@@ -83,20 +83,13 @@ namespace AirportRoads
 
         public void InitMod()
         {
-            try
-            {
-                // StreetDirectionViewer support
-                InitSDV();
-            }
-            catch (Exception e)
-            {
-                DebugUtils.Log(e.Message);
-            }
-
             GeneratedScrollPanel panel = panelGameObject.GetComponent<GeneratedScrollPanel>();
 
             ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600, "Runway");
             ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200, "Taxiway");
+
+            UIButton upgradeButton = panel.Find<UIButton>("Upgrade");
+            if (upgradeButton != null) upgradeButton.isVisible = true;
         }
 
         private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost, string prefixIcon)
@@ -131,7 +124,7 @@ namespace AirportRoads
             netInfo.m_class.m_layer = itemClass.m_layer;
             netInfo.m_class.m_level = itemClass.m_level;
             netInfo.m_class.m_service = ItemClass.Service.PublicTransport;
-            netInfo.m_class.m_subService = ItemClass.SubService.PublicTransportPlane;
+            netInfo.m_class.m_subService = ItemClass.SubService.None;
 
             // Adding icons
             netInfo.m_Atlas = m_atlas;
@@ -239,20 +232,23 @@ namespace AirportRoads
                 // Locked textures workaround
                 Texture2D texture2D = atlas.sprites[i].texture;
 
-                RenderTexture renderTexture = RenderTexture.GetTemporary(texture2D.width, texture2D.height, 0);
-                Graphics.Blit(texture2D, renderTexture);
+                if (texture2D != null)
+                {
+                    RenderTexture renderTexture = RenderTexture.GetTemporary(texture2D.width, texture2D.height, 0);
+                    Graphics.Blit(texture2D, renderTexture);
 
-                RenderTexture active = RenderTexture.active;
-                texture2D = new Texture2D(renderTexture.width, renderTexture.height);
-                RenderTexture.active = renderTexture;
-                texture2D.ReadPixels(new Rect(0f, 0f, (float)renderTexture.width, (float)renderTexture.height), 0, 0);
-                texture2D.Apply();
-                RenderTexture.active = active;
+                    RenderTexture active = RenderTexture.active;
+                    texture2D = new Texture2D(renderTexture.width, renderTexture.height);
+                    RenderTexture.active = renderTexture;
+                    texture2D.ReadPixels(new Rect(0f, 0f, (float)renderTexture.width, (float)renderTexture.height), 0, 0);
+                    texture2D.Apply();
+                    RenderTexture.active = active;
 
-                RenderTexture.ReleaseTemporary(renderTexture);
+                    RenderTexture.ReleaseTemporary(renderTexture);
 
-                textures[i] = texture2D;
-                textures[i].name = atlas.sprites[i].name;
+                    textures[i] = texture2D;
+                    textures[i].name = atlas.sprites[i].name;
+                }
             }
 
             for (int i = 0; i < newTextures.Length; i++)
@@ -264,14 +260,17 @@ namespace AirportRoads
 
             for (int i = 0; i < textures.Length; i++)
             {
-                UITextureAtlas.SpriteInfo spriteInfo = atlas[textures[i].name];
-                atlas.sprites.Add(new UITextureAtlas.SpriteInfo
+                if (textures[i] != null)
                 {
-                    texture = textures[i],
-                    name = textures[i].name,
-                    border = (spriteInfo != null) ? spriteInfo.border : new RectOffset(),
-                    region = regions[i]
-                });
+                    UITextureAtlas.SpriteInfo spriteInfo = atlas[textures[i].name];
+                    atlas.sprites.Add(new UITextureAtlas.SpriteInfo
+                    {
+                        texture = textures[i],
+                        name = textures[i].name,
+                        border = (spriteInfo != null) ? spriteInfo.border : new RectOffset(),
+                        region = regions[i]
+                    });
+                }
             }
 
             atlas.RebuildIndexes();
@@ -288,98 +287,6 @@ namespace AirportRoads
 
             return UIView.GetAView().defaultAtlas;
         }
-
-        #region StreetDirectionViewer support
-        private void InitSDV()
-        {
-            Type ArrowManager = Type.GetType("StreetDirectionViewer.ArrowManager, StreetDirectionViewer");
-            // SDV installed ?
-            if (ArrowManager == null) return;
-
-            // Getting StreetDirectionViewerUI instance
-            object instance = null;
-            FieldInfo field = typeof(ThreadingWrapper).GetField("m_ThreadingExtensions", BindingFlags.NonPublic | BindingFlags.Instance);
-            List<IThreadingExtension> threadingExtensions = field.GetValue(Singleton<SimulationManager>.instance.m_ThreadingWrapper) as List<IThreadingExtension>;
-            Type ThreadingExtension = TryGetType("StreetDirectionViewer.ThreadingExtension, StreetDirectionViewer");
-
-            for (int i = 0; i < threadingExtensions.Count; i++)
-            {
-                if (threadingExtensions[i].GetType() == ThreadingExtension)
-                {
-                    field = TryGetField(ThreadingExtension, "streetDirectionViewerUI", BindingFlags.NonPublic | BindingFlags.Instance);
-                    instance = field.GetValue(threadingExtensions[i]);
-                    DebugUtils.Log("StreetDirectionViewerUI instance found");
-                    break;
-                }
-            }
-
-            // SDV enabled ?
-            if (instance == null) return;
-            DebugUtils.Log("StreetDirectionViewer mod detected. Adding support.");
-
-            // Getting arrowManager
-            Type StreetDirectionViewerUI = TryGetType("StreetDirectionViewer.StreetDirectionViewerUI, StreetDirectionViewer");
-            field = TryGetField(StreetDirectionViewerUI, "arrowManager", BindingFlags.NonPublic | BindingFlags.Instance);
-            object arrowManager = field.GetValue(instance);
-
-            // Getting CreateButton
-            MethodInfo CreateButton = TryGetMethod(StreetDirectionViewerUI, "CreateButton", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            // Getting setShowStreetDirectionButtonState
-            MethodInfo ShowStreetDirection = TryGetMethod(StreetDirectionViewerUI, "setShowStreetDirectionButtonState", BindingFlags.Public | BindingFlags.Instance);
-
-            UIPanel optionsBar = GameObject.Find("OptionsBar").GetComponent<UIPanel>();
-            if (optionsBar == null) return;
-
-            optionsBar.eventComponentAdded += (c, component) =>
-            {
-                try
-                {
-                    GameObject gameObject = GameObject.Find("StreetDirectionViewerButton");
-
-                    if (panelGameObject.GetComponent<UIPanel>().isVisible && component.name.StartsWith("RoadsOptionPanel"))
-                    {
-                        DebugUtils.Log("RoadsOptionPanel added. Calling SDV CreateButton");
-
-                        if ((bool)CreateButton.Invoke(instance, new object[] { component }))
-                        {
-                            DebugUtils.Log("SDV button created");
-
-                            ShowStreetDirection.Invoke(instance, new object[] { true });
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    DebugUtils.Log(e.Message);
-                }
-            };
-        }
-
-        private static Type TryGetType(string typeName)
-        {
-            Type type = Type.GetType(typeName);
-            if (type == null) throw new Exception("Couldn't find the type " + typeName);
-
-            return type;
-        }
-
-        private static MethodInfo TryGetMethod(Type type, string name, BindingFlags flags)
-        {
-            MethodInfo method = type.GetMethod(name, flags);
-            if (method == null) throw new Exception("Couldn't find the method " + name);
-
-            return method;
-        }
-
-        private static FieldInfo TryGetField(Type type, string name, BindingFlags flags)
-        {
-            FieldInfo field = type.GetField(name, flags);
-            if (field == null) throw new Exception("Couldn't find the field " + name);
-
-            return field;
-        }
-        #endregion
     }
 
     public class AirportRoadsRoutine : MonoBehaviour
