@@ -27,7 +27,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.4";
+        public const string version = "1.3.5";
 
         public static AirportRoads instance;
         private GameObject m_gameObject;
@@ -88,8 +88,9 @@ namespace AirportRoads
             ShowNetwork("Airplane Runway", "Runway", panel, 7000, 600, "Runway");
             ShowNetwork("Airplane Taxiway", "Taxiway", panel, 4000, 200, "Taxiway");
 
-            UIButton upgradeButton = panel.Find<UIButton>("Upgrade");
-            if (upgradeButton != null) upgradeButton.isVisible = true;
+            OptionPanelBase optionPanel = (OptionPanelBase)typeof(GeneratedScrollPanel).GetMethod("CreateOptionPanel", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(panel, new object[] { "RoadsOptionPanel" });
+            optionPanel.HidePanel();
+            typeof(GeneratedScrollPanel).GetField("m_QuaysOptionPanel", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(panel, optionPanel);
         }
 
         private void ShowNetwork(string name, string desc, GeneratedScrollPanel panel, int constructionCost, int maintenanceCost, string prefixIcon)
@@ -124,7 +125,7 @@ namespace AirportRoads
             netInfo.m_class.m_layer = itemClass.m_layer;
             netInfo.m_class.m_level = itemClass.m_level;
             netInfo.m_class.m_service = ItemClass.Service.PublicTransport;
-            netInfo.m_class.m_subService = ItemClass.SubService.None;
+            netInfo.m_class.m_subService = ItemClass.SubService.PublicTransportPlane;
 
             // Adding icons
             netInfo.m_Atlas = m_atlas;
