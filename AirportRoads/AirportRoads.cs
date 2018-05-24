@@ -27,7 +27,7 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.5";
+        public const string version = "1.3.6";
 
         public static AirportRoads instance;
         private GameObject m_gameObject;
@@ -51,18 +51,18 @@ namespace AirportRoads
 
                     if (panelGameObject == null)
                     {
-                        DebugUtils.Log("PublicTransportPlanePanel not found.");
+                        DebugUtils.Warning("PublicTransportPlanePanel not found.");
                         return;
                     }
 
-                    DebugUtils.Log(panelGameObject.name + " found.");
+                    //DebugUtils.Log(panelGameObject.name + " found.");
 
                     LoadResources();
                     InitMod();
                 }
                 catch (Exception e)
                 {
-                    DebugUtils.Log("Failed to load.");
+                    //DebugUtils.Log("Failed to load.");
                     Debug.LogException(e);
                 }
             }
@@ -106,7 +106,7 @@ namespace AirportRoads
                 return;
             }
 
-            DebugUtils.Log("NetInfo named '" + name + "' found.");
+            //DebugUtils.Log("NetInfo named '" + name + "' found.");
 
             PlayerNetAI netAI = netInfo.m_netAI as PlayerNetAI;
 
@@ -118,14 +118,6 @@ namespace AirportRoads
             netInfo.m_availableIn = ItemClass.Availability.All;
             netInfo.m_placementStyle = ItemClass.Placement.Manual;
             typeof(NetInfo).GetField("m_UICategory", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(netInfo, "PublicTransportPlane");
-
-            // Changing the item class
-            ItemClass itemClass = netInfo.m_class;
-            netInfo.m_class = ScriptableObject.CreateInstance<ItemClass>();
-            netInfo.m_class.m_layer = itemClass.m_layer;
-            netInfo.m_class.m_level = itemClass.m_level;
-            netInfo.m_class.m_service = ItemClass.Service.PublicTransport;
-            netInfo.m_class.m_subService = ItemClass.SubService.PublicTransportPlane;
 
             // Adding icons
             netInfo.m_Atlas = m_atlas;
@@ -302,14 +294,14 @@ namespace AirportRoads
 
                 if (AirportRoads.panelGameObject == null) return;
 
-                DebugUtils.Log(AirportRoads.panelGameObject.name + " found.");
+                //DebugUtils.Log(AirportRoads.panelGameObject.name + " found.");
 
                 AirportRoads.instance.LoadResources();
                 AirportRoads.instance.InitMod();
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Failed to load.");
+                //DebugUtils.Log("Failed to load.");
                 Debug.LogException(e);
             }
         }
