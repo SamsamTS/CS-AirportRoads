@@ -9,7 +9,6 @@ using UnityEngine;
 using System;
 using System.IO;
 using System.Reflection;
-using System.Collections.Generic;
 
 namespace AirportRoads
 {
@@ -27,25 +26,27 @@ namespace AirportRoads
         }
         #endregion
 
-        public const string version = "1.3.6";
-
-        public static AirportRoads instance;
-        private GameObject m_gameObject;
+        public const string version = "1.3.7";
 
         public override void OnLevelLoaded(LoadMode mode)
         {
-            instance = this;
-            if (mode == LoadMode.LoadAsset || mode == LoadMode.NewAsset)
+            try
             {
-                if (m_gameObject == null || m_gameObject.name != "AirportRoads")
+                if (ToolManager.instance.m_properties.m_mode.IsFlagSet(ItemClass.Availability.AssetEditor))
                 {
-                    m_gameObject = new GameObject("AirportRoads");
-                    m_gameObject.AddComponent<AirportRoadsRoutine>();
+                    ToolsModifierControl.toolController.eventEditPrefabChanged += (p) =>
+                    {
+                        panelGameObject = GameObject.Find("LandscapingPathsPanel");
+
+                        if (panelGameObject == null) return;
+
+                        //DebugUtils.Log(AirportRoads.panelGameObject.name + " found.");
+
+                        LoadResources();
+                        InitMod();
+                    };
                 }
-            }
-            else if (mode == LoadMode.LoadGame || mode == LoadMode.NewGame)
-            {
-                try
+                else
                 {
                     panelGameObject = GameObject.Find("PublicTransportPlanePanel");
 
@@ -60,21 +61,14 @@ namespace AirportRoads
                     LoadResources();
                     InitMod();
                 }
-                catch (Exception e)
-                {
-                    //DebugUtils.Log("Failed to load.");
-                    Debug.LogException(e);
-                }
-            }
-        }
 
-        public override void OnLevelUnloading()
-        {
-            if (m_gameObject != null)
-            {
-                GameObject.Destroy(m_gameObject);
-                m_gameObject = null;
             }
+            catch (Exception e)
+            {
+                //DebugUtils.Log("Failed to load.");
+                Debug.LogException(e);
+            }
+
         }
 
         public static GameObject panelGameObject;
@@ -154,18 +148,18 @@ namespace AirportRoads
             if (m_atlas == null)
             {
                 string[] spriteNames = new string[]
-			    {
-				    "Runway",
-				    "RunwayDisabled",
-				    "RunwayFocused",
-				    "RunwayHovered",
-				    "RunwayPressed",
-				    "Taxiway",
-				    "TaxiwayDisabled",
-				    "TaxiwayFocused",
-				    "TaxiwayHovered",
-				    "TaxiwayPressed"
-			    };
+                {
+                    "Runway",
+                    "RunwayDisabled",
+                    "RunwayFocused",
+                    "RunwayHovered",
+                    "RunwayPressed",
+                    "Taxiway",
+                    "TaxiwayDisabled",
+                    "TaxiwayFocused",
+                    "TaxiwayHovered",
+                    "TaxiwayPressed"
+                };
                 m_atlas = CreateTextureAtlas("AirportRoads", spriteNames, "AirportRoads.Icons.");
             }
         }
@@ -279,31 +273,6 @@ namespace AirportRoads
             }
 
             return UIView.GetAView().defaultAtlas;
-        }
-    }
-
-    public class AirportRoadsRoutine : MonoBehaviour
-    {
-        public void Update()
-        {
-            if (AirportRoads.panelGameObject != null) return;
-
-            try
-            {
-                AirportRoads.panelGameObject = GameObject.Find("LandscapingPathsPanel");
-
-                if (AirportRoads.panelGameObject == null) return;
-
-                //DebugUtils.Log(AirportRoads.panelGameObject.name + " found.");
-
-                AirportRoads.instance.LoadResources();
-                AirportRoads.instance.InitMod();
-            }
-            catch (Exception e)
-            {
-                //DebugUtils.Log("Failed to load.");
-                Debug.LogException(e);
-            }
         }
     }
 }
